@@ -1,0 +1,43 @@
+import numpy as np
+import pandas as pd
+
+# dimensions
+dimensions = {
+    "Student": ["Ankit", "Dev", "Biswa"],
+    "City": ["Delhi", "Kolkata", "Bangalore"],
+    "Degree": ["Electronics", "Data Science", "Finance"]
+}
+
+# Creating 3x3x3 data cube for random sales data
+data_cube = np.random.randint(100, 1000, size=(3, 3, 3))
+
+# Converting to pandas DataFrame
+data_list = []
+for i, student in enumerate(dimensions["Student"]):
+    for j, city in enumerate(dimensions["City"]):
+        for k, degree in enumerate(dimensions["Degree"]):
+            data_list.append([student, city, degree, data_cube[i, j, k]])
+
+df = pd.DataFrame(data_list, columns=["Student", "City", "Degree", "Sales"])
+print("Original Data Cube:\n", df.head())
+
+#after dataframe - OLAP operations on the Sales data 
+# roll-up: data by Student
+rollup_df = df.groupby("Student")["Sales"].sum().reset_index()
+print("\nRoll-up (Aggregate by Student):\n", rollup_df)
+
+# drill-down: showing data for a specific Student (e.g., Dev)
+drilldown_df = df[df["Student"] == "Dev"]
+print("\nDrill-down (Data for Dev):\n", drilldown_df)
+
+# slice: Extracting data for specific city (e.g., Kolkata)
+slice_df = df[df["City"] == "Kolkata"]
+print("\nSlice (Data for Kolkata):\n", slice_df)
+
+# dice: Extracting data for specific conditions (e.g., Dev and Data Science degree)
+dice_df = df[(df["Student"] == "Dev") & (df["Degree"] == "Data Science")]
+print("\nDice (Data for Dev and Data Science):\n", dice_df)
+
+# Pivot: Rearrange data for better readability
+pivot_df = df.pivot_table(values="Sales", index=["City", "Degree"], columns="Student", aggfunc=np.sum)
+print("\nPivot Table:\n", pivot_df)
