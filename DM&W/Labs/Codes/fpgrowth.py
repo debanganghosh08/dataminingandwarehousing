@@ -1,118 +1,172 @@
 from collections import defaultdict
 
-# FP-Tree Node class
-class FPNode:
+#we are taking tree structure for FP growth algorithm tree
+#class for FP-Tree Node
+class Node:
     def __init__(self, item, count, parent):
-        self.item = item
-        self.count = count
-        self.parent = parent
-        self.children = {}
-        self.next_node = None
+        self.item = item  
+        self.count = count  
+        self.parent = parent  
+        self.children = {}  
+        self.next = None  
 
-# FP-Tree Class
+#Class for FP-Tree structure
 class FPTree:
     def __init__(self, transactions, min_support):
-        self.min_support = min_support
-        self.header_table = {}
-        self.root = FPNode(None, 1, None)
-        self.build_tree(transactions)
+        self.min_support = min_support  
+        self.header = {}  
+        self.root = Node(None, 1, None)  
+        self.support_count = defaultdict(int)  
+        self.build_tree(transactions)  
 
-    # Step 1: Count item frequencies and remove infrequent items
-    def find_frequent_items(self, transactions):
+    #counting frequency of items to filter low support ones
+    def get_frequent_items(self, transactions):
         item_counts = defaultdict(int)
         for transaction in transactions:
             for item in transaction:
-                item_counts[item] += 1
-        return {k: v for k, v in item_counts.items() if v >= self.min_support}
+                item_counts[item] += 1  
+        return {k: v for k, v in item_counts.items() if v >= self.min_support}  
 
-    # Step 2: Build FP-Tree
+    #FP-Tree construction
     def build_tree(self, transactions):
-        frequent_items = self.find_frequent_items(transactions)
+        freq_items = self.get_frequent_items(transactions)
 
-        # Sort transactions by frequency order
+        # Reordering transactions based on item frequency
         ordered_transactions = []
         for transaction in transactions:
-            ordered_transaction = [item for item in transaction if item in frequent_items]
-            ordered_transaction.sort(key=lambda x: frequent_items[x], reverse=True)
-            ordered_transactions.append(ordered_transaction)
+            sorted_transaction = [item for item in transaction if item in freq_items]
+            sorted_transaction.sort(key=lambda x: freq_items[x], reverse=True)
+            ordered_transactions.append(sorted_transaction)
 
-        # Insert transactions into FP-tree
+        #insert them into the FP-tree
         for transaction in ordered_transactions:
-            self.insert_transaction(transaction, self.root)
+            self.insert_node(transaction, self.root)
 
-    # Step 3: Insert transaction into tree
-    def insert_transaction(self, transaction, node):
-        if len(transaction) == 0:
-            return
-        first_item = transaction[0]
+    #insert transactions into the FP-Tree
+    def insert_node(self, transaction, node):
+        if not transaction:
+            return  
+
+        first_item = transaction[0]  
         if first_item in node.children:
-            node.children[first_item].count += 1
+            node.children[first_item].count += 1  
         else:
-            node.children[first_item] = FPNode(first_item, 1, node)
-            if first_item in self.header_table:
-                self.link_nodes(first_item, node.children[first_item])
+            node.children[first_item] = Node(first_item, 1, node)  
+            if first_item in self.header:
+                self.link_nodes(first_item, node.children[first_item])  
             else:
-                self.header_table[first_item] = node.children[first_item]
+                self.header[first_item] = node.children[first_item]  
 
-        self.insert_transaction(transaction[1:], node.children[first_item])
+        self.insert_node(transaction[1:], node.children[first_item])  
 
-    # Step 4: Link nodes in the header table
+    #link nodes of same item in different paths
     def link_nodes(self, item, new_node):
-        current_node = self.header_table[item]
-        while current_node.next_node:
-            current_node = current_node.next_node
-        current_node.next_node = new_node
+        current = self.header[item]
+        while current.next:
+            current = current.next  
+        current.next = new_node  
 
-    # Step 5: Extract conditional pattern base
-    def find_conditional_pattern_base(self, item):
-        base_patterns = []
-        node = self.header_table[item]
+    #find conditional pattern bases
+    def get_pattern_base(self, item):
+        patterns = []  
+        node = self.header[item]  
         while node:
-            path = []
-            parent = node.parent
+            path = []  
+            parent = node.parent  
             while parent and parent.item:
-                path.append(parent.item)
-                parent = parent.parent
+                path.append(parent.item)  
+                parent = parent.parent  
             for _ in range(node.count):
-                base_patterns.append(path)
-            node = node.next_node
-        return base_patterns
+                patterns.append(path)  
+            node = node.next  
+        return patterns  
 
-    # Step 6: Extract frequent itemsets recursively
-    def mine_tree(self, prefix, frequent_patterns):
-        for item in sorted(self.header_table, key=lambda x: self.header_table[x].count):
-            new_prefix = prefix.copy()
-            new_prefix.append(item)
-            frequent_patterns.append(new_prefix)
+    # min tree recursively
+    def mine_patterns(self, prefix, freq_patterns):
+        for item in sorted(self.header, key=lambda x: self.header[x].count):
+            new_prefix = prefix.copy()  
+            new_prefix.append(item)  
+            support = self.header[item].count  
+            freq_patterns.append((new_prefix, support))  
+            self.support_count[tuple(new_prefix)] = support  
 
-            # Find conditional pattern base
-            conditional_pattern_base = self.find_conditional_pattern_base(item)
-            conditional_tree = FPTree(conditional_pattern_base, self.min_support)
-            conditional_tree.mine_tree(new_prefix, frequent_patterns)
+            # conditional tree construction 
+            conditional_base = self.get_pattern_base(item)  
+            conditional_tree = FPTree(conditional_base, self.min_support)  
+            conditional_tree.mine_patterns(new_prefix, freq_patterns)  
 
-# Step 7: FP-Growth Algorithm function
+#start FP-Growth process
 def fp_growth(transactions, min_support):
-    fp_tree = FPTree(transactions, min_support)
-    frequent_patterns = []
-    fp_tree.mine_tree([], frequent_patterns)
-    return frequent_patterns
+    tree = FPTree(transactions, min_support)  
+    freq_patterns = []  
+    tree.mine_patterns([], freq_patterns)  
+    return freq_patterns  
 
-# Example Dataset (List of Transactions)
+#print the final frequent patterns
+def show_patterns(freq_patterns):
+    print("\nFrequent Itemsets with Support:")
+    for pattern, support in freq_patterns:
+        print(f"{pattern} -> Support: {support}")  
+
+# dataset for sample
 transactions = [
-    ['bread', 'milk'],
-    ['bread', 'diaper', 'beer', 'eggs'],
-    ['milk', 'diaper', 'beer', 'coke'],
-    ['bread', 'milk', 'diaper', 'beer'],
-    ['bread', 'milk', 'diaper', 'coke']
+    ['milk', 'bread', 'butter'],
+    ['milk', 'chocolate', 'energy drink', 'bread'],
+    ['milk', 'bread', 'chocolate', 'coke'],
+    ['milk', 'bread', 'butter', 'eggs'],
+    ['chocolate', 'energy drink', 'coke'],
+    ['milk', 'bread', 'butter', 'cereal'],
+    ['bread', 'butter', 'jam', 'tea'],
+    ['bread', 'chocolate', 'energy drink'],
+    ['milk', 'bread', 'butter', 'coffee'],
+    ['bread', 'eggs', 'butter'],
+    ['milk', 'bread', 'butter', 'chocolate'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['milk', 'cereal', 'juice'],
+    ['bread', 'butter', 'coffee'],
+    ['bread', 'chocolate', 'energy drink', 'milk'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['chocolate', 'energy drink', 'coke', 'chips'],
+    ['milk', 'bread', 'butter', 'eggs'],
+    ['bread', 'butter', 'coffee'],
+    ['chocolate', 'energy drink', 'chips', 'soda'],
+    ['milk', 'cereal', 'juice'],
+    ['bread', 'butter', 'eggs'],
+    ['milk', 'chocolate', 'energy drink', 'bread'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['chocolate', 'energy drink', 'coke', 'chips'],
+    ['milk', 'bread', 'butter', 'eggs'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['chocolate', 'energy drink', 'coke', 'chips'],
+    ['bread', 'butter', 'tea'],
+    ['milk', 'bread', 'butter', 'eggs'],
+    ['bread', 'butter', 'jam'],
+    ['chocolate', 'energy drink', 'coke'],
+    ['bread', 'butter', 'eggs'],
+    ['milk', 'bread', 'butter'],
+    ['chocolate', 'energy drink', 'chips'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['chocolate', 'energy drink', 'coke', 'chips'],
+    ['milk', 'bread', 'butter', 'eggs'],
+    ['bread', 'butter', 'coffee'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['chocolate', 'energy drink', 'coke', 'chips'],
+    ['milk', 'bread', 'butter', 'cereal'],
+    ['bread', 'butter', 'jam', 'tea'],
+    ['bread', 'chocolate', 'energy drink'],
+    ['milk', 'bread', 'butter', 'coffee'],
+    ['bread', 'eggs', 'butter'],
+    ['milk', 'bread', 'butter', 'chocolate'],
+    ['milk', 'bread', 'butter', 'jam'],
+    ['milk', 'cereal', 'juice'],
+    ['bread', 'butter', 'coffee'],
 ]
 
-# Set Minimum Support Threshold
-min_support = 2
+# minimum support threshold
+min_support = 5  
 
-# Run FP-Growth Algorithm
+# FP-Growth algorithm
 frequent_itemsets = fp_growth(transactions, min_support)
 
-# Print Frequent Itemsets
-print("Frequent Itemsets:")
-for itemset in frequent_itemsets:
-    print(itemset)
+# results
+show_patterns(frequent_itemsets)
